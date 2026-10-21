@@ -6,3 +6,4 @@ tools/shots/
 # cf CLI local state
 .cloudflare/
 .wrangler/
+dist/
