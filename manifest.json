@@ -1,0 +1,16 @@
+{
+  "name": "Habit Tracker",
+  "short_name": "Habits",
+  "description": "Monthly habit tracker with weekly progress, daily charts and consistency rankings.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eeeeee",
+  "theme_color": "#0038bd",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
