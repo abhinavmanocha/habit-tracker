@@ -37,6 +37,28 @@ python -m http.server 8014 --bind 127.0.0.1
 python tools/ui_check.py        # smoke test + screenshots into tools/shots/
 ```
 
+## Garmin sleep sync
+
+`tools/garmin_sync.py` logs into Garmin Connect, reads each night's sleep, and
+publishes `garmin-sleep.json` next to the app; the app fetches that file on load and
+after the **Sync Garmin** button, and ticks any habit flagged *Auto-fill from Garmin sleep*.
+
+```
+C:\Python313\python.exe tools\garmin_sync.py            # fetch + publish + git push
+C:\Python313\python.exe tools\garmin_sync.py --no-push  # local file only
+C:\Python313\python.exe tools\garmin_sync.py --threshold 7.5 --include-hours
+```
+
+- Credentials: `~/.hermes/garmin.json` → `{"email", "password", "threshold_hours"}`.
+  Garth tokens are cached in `~/.hermes/garmin_tokens`, so MFA is only needed once.
+- Default window is the current month plus the previous one; a missed run self-heals
+  because every run refetches the whole window.
+- Scheduled task **Habit Tracker Garmin Sync** (Windows Task Scheduler) runs it daily
+  at 09:00. `Start-ScheduledTask -TaskName 'Habit Tracker Garmin Sync'` runs it on demand.
+- Nights with no Garmin record (watch off) or naps only produce no tick — by design.
+- `garmin-sleep.json` is public on Pages: it carries per-night booleans only. Add
+  `--include-hours` and it also carries durations (think before enabling).
+
 ## Deploy
 
 Live: **https://abhinavmanocha.github.io/habit-tracker/** (GitHub Pages, `main` branch root).
