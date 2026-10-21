@@ -133,6 +133,13 @@ def publish(payload: dict, push: bool) -> None:
     stamp = dt.date.today().isoformat()
     try:
         subprocess.run(["git", "-C", str(APP_DIR), "add", OUT_FILE.name], check=True)
+        staged = subprocess.run(
+            ["git", "-C", str(APP_DIR), "diff", "--cached", "--quiet"],
+            capture_output=True,
+        )
+        if staged.returncode == 0:
+            print("No change since the last sync — nothing to push.")
+            return
         subprocess.run(
             ["git", "-C", str(APP_DIR), "commit", "-q", "-m",
              "chore(garmin): sleep sync %s" % stamp],
