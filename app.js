@@ -7,6 +7,9 @@
 
   var STORAGE_KEY = 'habit-tracker-v2';
   var SYNC_URL = 'garmin-sleep.json';
+  var SYNC_API = 'https://habit-tracker-sync.abhinavmanocha.workers.dev';
+  var SYNC_KEY_STORAGE = 'ht-sync-key';
+  var SYNC_LAST_STORAGE = 'ht-last-sync';
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   var DAY_LETTER = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -17,9 +20,12 @@
   ];
 
   var habits = [];
+  var tombstones = [];          // [{ id, updatedAt }] so deletes survive a merge
   var view = { y: 0, m: 0 };
   var editingId = null;
   var saveTimer = null;
+  var pushTimer = null;
+  var syncing = false;
   var rowRefs = {};
 
   /* ---------------- small helpers ---------------- */
@@ -62,9 +68,15 @@
           name: String(h.name || 'Habit'),
           goals: (h.goals && typeof h.goals === 'object') ? h.goals : {},
           log: (h.log && typeof h.log === 'object') ? h.log : {},
-          source: h.source === 'garmin-sleep' ? 'garmin-sleep' : null
+          source: h.source === 'garmin-sleep' ? 'garmin-sleep' : null,
+          updatedAt: Number(h.updatedAt) || 0
         };
       });
+      tombstones = Array.isArray(data.deleted)
+        ? data.deleted.map(function (t) {
+            return { id: String(t.id), updatedAt: Number(t.updatedAt) || 0 };
+          })
+        : [];
     } catch (e) {
       console.warn('Could not read saved habits', e);
     }
@@ -72,11 +84,17 @@
 
   function save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, habits: habits }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(doc()));
       noteSaved();
+      schedulePush();
     } catch (e) {
       toast('Could not save — browser storage may be full');
     }
+  }
+
+  // The whole synced document. Tombstones ride along so deletes propagate.
+  function doc() {
+    return { version: 3, habits: habits, deleted: tombstones };
   }
 
   function noteSaved() {
@@ -433,6 +451,7 @@
         v = Math.max(0, Math.min(dim, v));
         goalInput.value = String(v);
         h.goals[mKey(view.y, view.m)] = v;
+        h.updatedAt = Date.now();
         save();
         updateRowStats(h);
         renderOverview();
@@ -508,6 +527,7 @@
   function toggle(h, k, box) {
     if (h.log[k]) delete h.log[k];
     else h.log[k] = true;
+    h.updatedAt = Date.now();
     box.classList.toggle('on');
     box.setAttribute('aria-pressed', h.log[k] ? 'true' : 'false');
     save();
@@ -611,12 +631,16 @@
           h.name = name;
           h.goals[mKey(view.y, view.m)] = goal;
           h.source = source;
+          h.updatedAt = Date.now();
         }
       });
     } else {
       var goals = {};
       goals[mKey(view.y, view.m)] = goal;
-      habits.push({ id: uid(), name: name, goals: goals, log: {}, source: source });
+      habits.push({
+        id: uid(), name: name, goals: goals, log: {}, source: source,
+        updatedAt: Date.now()
+      });
     }
     var wasNew = !editingId;
     save();
@@ -631,6 +655,7 @@
     var target = habits.filter(function (h) { return h.id === editingId; })[0];
     if (!target) return;
     if (!confirm('Delete “' + target.name + '” and its whole history?')) return;
+    tombstones.push({ id: editingId, updatedAt: Date.now() });
     habits = habits.filter(function (h) { return h.id !== editingId; });
     save();
     closeEditor();
@@ -667,11 +692,13 @@
     var changed = 0, keys = Object.keys(days);
     habits.forEach(function (h) {
       if (h.source !== 'garmin-sleep') return;
+      var touched = 0;
       keys.forEach(function (k) {
         var want = days[k] === true;
-        if (want && !h.log[k]) { h.log[k] = true; changed++; }
-        else if (!want && h.log[k]) { delete h.log[k]; changed++; }
+        if (want && !h.log[k]) { h.log[k] = true; touched++; }
+        else if (!want && h.log[k]) { delete h.log[k]; touched++; }
       });
+      if (touched) { h.updatedAt = Date.now(); changed += touched; }
     });
     if (changed) { save(); renderAll(); }
     return changed;
@@ -707,6 +734,198 @@
         if (!quiet) toast('Garmin sync unavailable: ' + err.message);
         return 0;
       });
+  }
+
+  /* ---------------- cloud sync (Cloudflare Worker + D1) ---------------- */
+  function syncKey() {
+    try { return localStorage.getItem(SYNC_KEY_STORAGE) || ''; } catch (e) { return ''; }
+  }
+  function hasSync() { return syncKey().length > 0; }
+
+  function setCloudState(text, state) {
+    var pill = document.getElementById('cloudState');
+    if (pill) {
+      pill.textContent = text;
+      pill.setAttribute('data-state', state || 'off');
+    }
+  }
+
+  function stamp() {
+    var d = new Date();
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function markSynced() {
+    try { localStorage.setItem(SYNC_LAST_STORAGE, String(Date.now())); } catch (e) { /* ignore */ }
+    setCloudState('Synced · ' + stamp(), 'ok');
+  }
+
+  function schedulePush() {
+    if (!hasSync()) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () { pushRemote(); }, 1500);
+  }
+
+  // Newest metadata wins; ticks are unioned (a tick is additive across devices).
+  function mergeHabit(a, b) {
+    var newer = (a.updatedAt || 0) >= (b.updatedAt || 0) ? a : b;
+    var log = {};
+    [a.log || {}, b.log || {}].forEach(function (src) {
+      Object.keys(src).forEach(function (k) { if (src[k]) log[k] = true; });
+    });
+    var goals = {};
+    [a.goals || {}, b.goals || {}].forEach(function (src) {
+      Object.keys(src).forEach(function (k) { goals[k] = src[k]; });
+    });
+    return {
+      id: newer.id,
+      name: newer.name,
+      goals: goals,
+      log: log,
+      source: newer.source === 'garmin-sleep' ? 'garmin-sleep' : null,
+      updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0)
+    };
+  }
+
+  function mergeDocs(localDoc, remoteDoc) {
+    var tomb = {};
+    function note(list) {
+      (list || []).forEach(function (t) {
+        if (!t || !t.id) return;
+        tomb[t.id] = Math.max(tomb[t.id] || 0, Number(t.updatedAt) || 0);
+      });
+    }
+    note(localDoc.deleted);
+    note(remoteDoc.deleted);
+
+    var map = {};
+    (remoteDoc.habits || []).forEach(function (h) { if (h && h.id) map[h.id] = h; });
+    (localDoc.habits || []).forEach(function (h) {
+      if (!h || !h.id) return;
+      map[h.id] = map[h.id] ? mergeHabit(h, map[h.id]) : h;
+    });
+
+    var merged = [];
+    Object.keys(map).forEach(function (id) {
+      var h = map[id];
+      if ((tomb[id] || 0) >= (h.updatedAt || 0) && tomb[id]) return;  // delete wins
+      merged.push(h);
+    });
+    var deleted = Object.keys(tomb).map(function (id) {
+      return { id: id, updatedAt: tomb[id] };
+    });
+    return { version: 3, habits: merged, deleted: deleted };
+  }
+
+  function pullRemote() {
+    if (!hasSync()) return Promise.resolve(false);
+    syncing = true;
+    setCloudState('Syncing…', 'busy');
+    return fetch(SYNC_API + '/api/state', {
+      headers: { Authorization: 'Bearer ' + syncKey() },
+      cache: 'no-store'
+    })
+      .then(function (res) {
+        if (res.status === 401) throw new Error('key rejected');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        syncing = false;
+        if (!data || !data.payload) {          // empty server: seed it from this device
+          pushRemote();
+          return false;
+        }
+        var merged = mergeDocs(doc(), data.payload);
+        var changed = JSON.stringify(merged) !== JSON.stringify(doc());
+        if (changed) {
+          habits = merged.habits;
+          tombstones = merged.deleted;
+          save();
+          renderAll();
+        }
+        markSynced();
+        return changed;
+      })
+      .catch(function (err) {
+        syncing = false;
+        setCloudState('Sync error · ' + err.message, 'off');
+        return false;
+      });
+  }
+
+  function pushRemote() {
+    if (!hasSync()) return Promise.resolve(false);
+    return fetch(SYNC_API + '/api/state', {
+      method: 'PUT',
+      headers: {
+        Authorization: 'Bearer ' + syncKey(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ payload: doc() })
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        markSynced();
+        return true;
+      })
+      .catch(function (err) {
+        setCloudState('Push failed · ' + err.message, 'off');
+        return false;
+      });
+  }
+
+  function refreshCloudUI() {
+    var nowBtn = document.getElementById('cloudSyncNow');
+    if (hasSync()) {
+      var last = 0;
+      try { last = Number(localStorage.getItem(SYNC_LAST_STORAGE)) || 0; } catch (e) { last = 0; }
+      setCloudState(last ? 'Synced · ' + stamp() : 'Connected', 'ok');
+      document.getElementById('cloudBtn').textContent = 'Change key';
+      if (nowBtn) nowBtn.style.display = '';
+    } else {
+      setCloudState('Sync off', 'off');
+      document.getElementById('cloudBtn').textContent = 'Connect';
+      if (nowBtn) nowBtn.style.display = 'none';
+    }
+  }
+
+  var cloudScrim = document.getElementById('cloudScrim');
+
+  function openCloudModal() {
+    document.getElementById('cloudKey').value = syncKey();
+    document.getElementById('cloudForget').style.display = hasSync() ? '' : 'none';
+    cloudScrim.classList.add('open');
+    setTimeout(function () { document.getElementById('cloudKey').focus(); }, 60);
+  }
+
+  function closeCloudModal() {
+    cloudScrim.classList.remove('open');
+  }
+
+  function connectCloud() {
+    var key = document.getElementById('cloudKey').value.trim();
+    if (!key) { toast('Paste the sync key first'); return; }
+    try { localStorage.setItem(SYNC_KEY_STORAGE, key); } catch (e) {
+      toast('Could not store the key in this browser');
+      return;
+    }
+    closeCloudModal();
+    refreshCloudUI();
+    pullRemote().then(function (changed) {
+      toast(changed ? 'Connected — pulled changes from another device' : 'Connected');
+      pushRemote();
+    });
+  }
+
+  function disconnectCloud() {
+    try {
+      localStorage.removeItem(SYNC_KEY_STORAGE);
+      localStorage.removeItem(SYNC_LAST_STORAGE);
+    } catch (e) { /* ignore */ }
+    closeCloudModal();
+    refreshCloudUI();
+    toast('Cloud sync disconnected');
   }
 
   /* ---------------- render all ---------------- */
@@ -763,9 +982,15 @@
             name: String(h.name || 'Habit'),
             goals: (h.goals && typeof h.goals === 'object') ? h.goals : {},
             log: (h.log && typeof h.log === 'object') ? h.log : {},
-            source: h.source === 'garmin-sleep' ? 'garmin-sleep' : null
+            source: h.source === 'garmin-sleep' ? 'garmin-sleep' : null,
+            updatedAt: Number(h.updatedAt) || 0
           };
         });
+        tombstones = Array.isArray(data.deleted)
+          ? data.deleted.map(function (t) {
+              return { id: String(t.id), updatedAt: Number(t.updatedAt) || 0 };
+            })
+          : [];
         save();
         renderAll();
         toast('Backup imported');
@@ -792,6 +1017,15 @@
 
     document.getElementById('addBtn').addEventListener('click', function () { openEditor(null); });
     document.getElementById('syncBtn').addEventListener('click', function () { syncGarmin({ quiet: false }); });
+    document.getElementById('cloudBtn').addEventListener('click', openCloudModal);
+    document.getElementById('cloudSyncNow').addEventListener('click', function () { pullRemote(); });
+    document.getElementById('cloudCancel').addEventListener('click', closeCloudModal);
+    document.getElementById('cloudSave').addEventListener('click', connectCloud);
+    document.getElementById('cloudForget').addEventListener('click', disconnectCloud);
+    cloudScrim.addEventListener('click', function (ev) { if (ev.target === cloudScrim) closeCloudModal(); });
+    document.getElementById('cloudKey').addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); connectCloud(); }
+    });
     document.getElementById('cancelBtn').addEventListener('click', closeEditor);
     document.getElementById('saveBtn').addEventListener('click', commitEditor);
     document.getElementById('deleteHabit').addEventListener('click', deleteHabit);
@@ -814,10 +1048,15 @@
 
     load();
     renderAll();
+    refreshCloudUI();
+    if (hasSync()) pullRemote();
     syncGarmin({ quiet: true });   // silent on first paint; failure just greys the pill
 
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) renderAll();   // day rollover while open
+      if (!document.hidden) {
+        renderAll();                      // day rollover while open
+        if (hasSync()) pullRemote();      // catch up with other devices
+      }
     });
 
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0 &&

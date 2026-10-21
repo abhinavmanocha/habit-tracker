@@ -80,6 +80,11 @@
         <div class="tile amber"><div class="k">Consistency</div><div class="v" id="tileCons">0%</div></div>
         <div class="tile"><div class="k">Perfect days</div><div class="v" id="tilePerfect">0</div></div>
       </div>
+      <div class="cloud-row">
+        <span class="sync-pill" id="cloudState" data-state="off">Sync off</span>
+        <button class="btn ghost" id="cloudSyncNow" type="button" style="display:none">Sync now</button>
+        <button class="btn ghost" id="cloudBtn" type="button">Connect</button>
+      </div>
       <p class="sub" style="margin-top:14px">
         <button class="btn ghost" id="exportBtn" type="button">Export backup</button>
         <button class="btn ghost" id="importBtn" type="button">Import backup</button>
@@ -108,6 +113,20 @@
       <button class="btn ghost" id="cancelBtn" type="button">Cancel</button>
       <button class="btn danger" id="deleteHabit" type="button">Delete</button>
       <button class="btn primary" id="saveBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="cloudScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
+    <h2 id="cloudTitle">Cloud sync</h2>
+    <p class="hint">Enter the sync key on each device. It stays in this browser and is only sent to your own Cloudflare Worker.</p>
+    <label class="field" for="cloudKey">Sync key</label>
+    <input type="text" id="cloudKey" autocomplete="off" spellcheck="false" placeholder="word-word-0000-word">
+    <div class="modal-actions">
+      <button class="btn ghost" id="cloudCancel" type="button">Cancel</button>
+      <button class="btn danger" id="cloudForget" type="button">Disconnect</button>
+      <button class="btn primary" id="cloudSave" type="button">Connect</button>
     </div>
   </div>
 </div>

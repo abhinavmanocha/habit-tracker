@@ -177,6 +177,64 @@ def run(page):
     page.wait_for_timeout(200)
     check("habit deleted (7 rows)", page.locator("#grid tbody tr").count() == 7)
 
+    # ---- cloud sync (mocked Worker: same contract as the deployed one) ----
+    site = {"payload": None, "puts": 0}
+
+    def worker(route):
+        req = route.request
+        if req.method == "OPTIONS":
+            return route.fulfill(status=204)
+        if "test-key" not in (req.headers.get("authorization") or ""):
+            return route.fulfill(status=401, content_type="application/json",
+                                 body='{"error":"unauthorized"}')
+        if req.method == "PUT":
+            site["payload"] = (req.post_data_json or {}).get("payload")
+            site["puts"] += 1
+            return route.fulfill(status=200, content_type="application/json",
+                                 body='{"ok":true,"updated_at":1}')
+        return route.fulfill(
+            status=200, content_type="application/json",
+            body=_json.dumps({"ok": True, "payload": site["payload"], "updated_at": 1}))
+
+    page.route("**/habit-tracker-sync.abhinavmanocha.workers.dev/**", worker)
+
+    page.click("#cloudBtn")
+    page.fill("#cloudKey", "test-key")
+    page.click("#cloudSave")
+    page.wait_for_timeout(2200)
+    pushed = site["payload"] or {}
+    check("cloud: pushed the local document",
+          site["puts"] >= 1 and len(pushed.get("habits", [])) == 7,
+          (site["puts"], len(pushed.get("habits", []))))
+    check("cloud: pill reports synced", "Synced" in page.locator("#cloudState").inner_text(),
+          page.locator("#cloudState").inner_text())
+
+    # a second device writes a habit + a tick; this device should pick both up
+    site["payload"]["habits"].append({
+        "id": "remote-1", "name": "Remote habit", "goals": {}, "log": {today.isoformat(): True},
+        "source": None, "updatedAt": 1,
+    })
+    page.click("#cloudSyncNow")
+    page.wait_for_timeout(1800)
+    check("cloud: pulled a habit written on another device",
+          page.locator("#grid tbody tr", has_text="Remote habit").count() == 1)
+    check("cloud: pulled its tick too",
+          "on" in (page.locator("#grid tbody tr", has_text="Remote habit").first
+                   .locator("button.box").nth(today.day - 1).get_attribute("class") or ""))
+    check("cloud: row count reflects the merge", page.locator("#grid tbody tr").count() == 8,
+          page.locator("#grid tbody tr").count())
+
+    # deleting must propagate as a tombstone, not resurrect on the next pull
+    page.locator("#grid tbody tr", has_text="Remote habit").first.locator(".name-btn").click()
+    page.click("#deleteHabit")
+    page.wait_for_timeout(2300)
+    pushed = site["payload"] or {}
+    ids = [h.get("id") for h in pushed.get("habits", [])]
+    check("cloud: delete removed it from the server document", "remote-1" not in ids, ids)
+    check("cloud: tombstone published",
+          any(t.get("id") == "remote-1" for t in pushed.get("deleted", [])),
+          pushed.get("deleted"))
+
     check("no console errors overall", not console_errors, console_errors)
 
 
