@@ -275,6 +275,11 @@ input[type="text"]:focus, input[type="number"]:focus { background: #fff; border-
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------------- responsive ---------------- */
+@media (max-width: 1360px) {
+  :root { --namew: 168px; }
+  td.day-cell { width: 24px; min-width: 24px; }
+  .ov th.day-h, .ov td.ov-day { width: 24px; min-width: 24px; }
+}
 @media (max-width: 960px) {
   .charts, .bottom { grid-template-columns: minmax(0, 1fr); }
 }

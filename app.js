@@ -877,16 +877,19 @@
 
   function refreshCloudUI() {
     var nowBtn = document.getElementById('cloudSyncNow');
+    var note = document.getElementById('storageNote');
     if (hasSync()) {
       var last = 0;
       try { last = Number(localStorage.getItem(SYNC_LAST_STORAGE)) || 0; } catch (e) { last = 0; }
       setCloudState(last ? 'Synced · ' + stamp() : 'Connected', 'ok');
       document.getElementById('cloudBtn').textContent = 'Change key';
       if (nowBtn) nowBtn.style.display = '';
+      if (note) note.textContent = 'Synced through your Cloudflare Worker — every connected device sees the same habits.';
     } else {
       setCloudState('Sync off', 'off');
       document.getElementById('cloudBtn').textContent = 'Connect';
       if (nowBtn) nowBtn.style.display = 'none';
+      if (note) note.textContent = 'Data is stored in this browser only.';
     }
   }
 
