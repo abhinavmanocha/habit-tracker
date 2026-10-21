@@ -1,5 +1,5 @@
 /* Offline cache for the habit tracker. Bump CACHE on release. */
-const CACHE = 'habits-v2';
+const CACHE = 'habits-v3';
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './manifest.json',
   './icon-192.png', './icon-512.png'

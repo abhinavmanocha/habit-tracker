@@ -6,6 +6,7 @@
   'use strict';
 
   var STORAGE_KEY = 'habit-tracker-v2';
+  var SYNC_URL = 'garmin-sleep.json';
   var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   var DAY_LETTER = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -60,7 +61,8 @@
           id: String(h.id || uid()),
           name: String(h.name || 'Habit'),
           goals: (h.goals && typeof h.goals === 'object') ? h.goals : {},
-          log: (h.log && typeof h.log === 'object') ? h.log : {}
+          log: (h.log && typeof h.log === 'object') ? h.log : {},
+          source: h.source === 'garmin-sleep' ? 'garmin-sleep' : null
         };
       });
     } catch (e) {
@@ -410,6 +412,11 @@
       nameBtn.title = 'Edit ' + h.name;
       nameBtn.addEventListener('click', function () { openEditor(h); });
       nameCell.appendChild(nameBtn);
+      if (h.source === 'garmin-sleep') {
+        var badge = el('span', 'badge', 'Garmin');
+        badge.title = 'Ticked automatically from Garmin sleep';
+        nameCell.appendChild(badge);
+      }
       tr.appendChild(nameCell);
 
       var goal = goalFor(h, view.y, view.m);
@@ -576,6 +583,7 @@
     var goalInput = document.getElementById('goalInput');
     goalInput.max = String(daysInMonth(view.y, view.m));
     goalInput.value = String(h ? goalFor(h, view.y, view.m) : daysInMonth(view.y, view.m));
+    document.getElementById('garminToggle').checked = !!(h && h.source === 'garmin-sleep');
     document.getElementById('deleteHabit').style.display = h ? '' : 'none';
     scrim.classList.add('open');
     setTimeout(function () { nameInput.focus(); }, 60);
@@ -594,23 +602,28 @@
     if (!isFinite(goal)) goal = dim;
     goal = Math.max(0, Math.min(dim, goal));
 
+    var garmin = document.getElementById('garminToggle').checked;
+    var source = garmin ? 'garmin-sleep' : null;
+
     if (editingId) {
       habits.forEach(function (h) {
         if (h.id === editingId) {
           h.name = name;
           h.goals[mKey(view.y, view.m)] = goal;
+          h.source = source;
         }
       });
     } else {
       var goals = {};
       goals[mKey(view.y, view.m)] = goal;
-      habits.push({ id: uid(), name: name, goals: goals, log: {} });
+      habits.push({ id: uid(), name: name, goals: goals, log: {}, source: source });
     }
     var wasNew = !editingId;
     save();
     closeEditor();
     renderAll();
     toast(wasNew ? 'Habit added' : 'Saved');
+    if (garmin) syncGarmin({ quiet: false });
   }
 
   function deleteHabit() {
@@ -630,11 +643,70 @@
     STARTERS.forEach(function (name) {
       var goals = {};
       goals[mKey(view.y, view.m)] = dim;
-      habits.push({ id: uid(), name: name, goals: goals, log: {} });
+      habits.push({
+        id: uid(), name: name, goals: goals, log: {},
+        source: name === 'Sleep 7 hours' ? 'garmin-sleep' : null
+      });
     });
     save();
     renderAll();
     toast('Starter habits added');
+    syncGarmin({ quiet: true });
+  }
+
+  /* ---------------- Garmin sleep sync ---------------- */
+  function setSyncStatus(text, state) {
+    var pill = document.getElementById('syncState');
+    if (!pill) return;
+    pill.textContent = text;
+    pill.setAttribute('data-state', state || 'off');
+  }
+
+  // Mirror the published nights onto every habit flagged as Garmin-sourced.
+  function applyGarminDays(days) {
+    var changed = 0, keys = Object.keys(days);
+    habits.forEach(function (h) {
+      if (h.source !== 'garmin-sleep') return;
+      keys.forEach(function (k) {
+        var want = days[k] === true;
+        if (want && !h.log[k]) { h.log[k] = true; changed++; }
+        else if (!want && h.log[k]) { delete h.log[k]; changed++; }
+      });
+    });
+    if (changed) { save(); renderAll(); }
+    return changed;
+  }
+
+  function syncGarmin(opts) {
+    var quiet = !!(opts && opts.quiet);
+    setSyncStatus('Garmin · syncing…', 'busy');
+    return fetch(SYNC_URL + '?cb=' + Date.now(), { cache: 'no-store' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        var days = (data && data.days) || {};
+        if (!Object.keys(days).length) {
+          setSyncStatus('Garmin · no nights yet', 'off');
+          return 0;
+        }
+        var changed = applyGarminDays(days);
+        var when = data.generated ? new Date(data.generated) : null;
+        var stamp = (when && !isNaN(when.getTime()))
+          ? when.toLocaleString(undefined, {
+              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            })
+          : 'synced';
+        setSyncStatus('Garmin · ' + stamp, 'ok');
+        if (changed && !quiet) toast(changed + ' night' + (changed === 1 ? '' : 's') + ' synced');
+        return changed;
+      })
+      .catch(function (err) {
+        setSyncStatus('Garmin · not connected', 'off');
+        if (!quiet) toast('Garmin sync unavailable: ' + err.message);
+        return 0;
+      });
   }
 
   /* ---------------- render all ---------------- */
@@ -690,7 +762,8 @@
             id: String(h.id || uid()),
             name: String(h.name || 'Habit'),
             goals: (h.goals && typeof h.goals === 'object') ? h.goals : {},
-            log: (h.log && typeof h.log === 'object') ? h.log : {}
+            log: (h.log && typeof h.log === 'object') ? h.log : {},
+            source: h.source === 'garmin-sleep' ? 'garmin-sleep' : null
           };
         });
         save();
@@ -718,6 +791,7 @@
     mSel.addEventListener('change', function () { view.m = parseInt(mSel.value, 10); renderAll(); });
 
     document.getElementById('addBtn').addEventListener('click', function () { openEditor(null); });
+    document.getElementById('syncBtn').addEventListener('click', function () { syncGarmin({ quiet: false }); });
     document.getElementById('cancelBtn').addEventListener('click', closeEditor);
     document.getElementById('saveBtn').addEventListener('click', commitEditor);
     document.getElementById('deleteHabit').addEventListener('click', deleteHabit);
@@ -740,6 +814,7 @@
 
     load();
     renderAll();
+    syncGarmin({ quiet: true });   // silent on first paint; failure just greys the pill
 
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) renderAll();   // day rollover while open

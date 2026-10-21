@@ -60,6 +60,17 @@ body::before {
 }
 h1 { font-size: 21px; margin: 0; font-weight: 700; letter-spacing: -.4px; }
 .sub { margin: 0; font-size: 12px; color: var(--muted); font-weight: 500; }
+.sync-pill {
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px;
+  background: #e9ebf3; color: var(--muted); white-space: nowrap;
+}
+.sync-pill[data-state="ok"] { background: var(--soft-blue); color: var(--blue); }
+.sync-pill[data-state="busy"] { background: var(--soft-amber); color: #9a5a00; }
+.check-row {
+  display: flex; align-items: center; gap: 9px; margin-top: 16px;
+  font-size: 13.5px; font-weight: 600; cursor: pointer;
+}
+.check-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--blue); margin: 0; }
 .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 select, .btn {
   font-family: inherit; font-size: 13px; font-weight: 600;
@@ -135,11 +146,18 @@ td.day-cell { width: 27px; min-width: 27px; text-align: center; }
 .hname-cell {
   text-align: left; padding: 6px 8px 6px 12px;
   width: var(--namew); min-width: var(--namew); max-width: var(--namew);
+  display: flex; align-items: center; gap: 5px;
 }
 .name-btn {
   background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
   font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink);
   text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1 1 auto; min-width: 0;
+}
+.badge {
+  flex: 0 0 auto; font-size: 8.5px; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--blue); background: var(--soft-blue);
+  border-radius: 5px; padding: 2px 4px; line-height: 1.2;
 }
 .name-btn:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 

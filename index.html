@@ -24,12 +24,13 @@
       <div class="logo" aria-hidden="true">✓</div>
       <div>
         <h1>Habit Tracker</h1>
-        <p class="sub" id="saveState">All changes saved</p>
+        <p class="sub"><span id="saveState">All changes saved</span> · <span class="sync-pill" id="syncState" data-state="off">Garmin · not connected</span></p>
       </div>
     </div>
     <div class="controls">
       <select id="yearSel" aria-label="Year"></select>
       <select id="monthSel" aria-label="Month"></select>
+      <button class="btn ghost" id="syncBtn" type="button">Sync Garmin</button>
       <button class="btn primary" id="addBtn" type="button">+ New habit</button>
     </div>
   </div>
@@ -98,6 +99,11 @@
     <input type="text" id="nameInput" maxlength="60" autocomplete="off" placeholder="e.g. Exercise 45 min">
     <label class="field" for="goalInput">Monthly goal (days)</label>
     <input type="number" id="goalInput" min="0" max="31" step="1">
+    <label class="check-row" for="garminToggle">
+      <input type="checkbox" id="garminToggle">
+      <span>Auto-fill from Garmin sleep</span>
+    </label>
+    <p class="hint" id="garminHint">Nights that reach the target are ticked for you on sync.</p>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelBtn" type="button">Cancel</button>
       <button class="btn danger" id="deleteHabit" type="button">Delete</button>

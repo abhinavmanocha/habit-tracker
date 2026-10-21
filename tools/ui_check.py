@@ -27,6 +27,22 @@ def run(page):
     page.on("pageerror", lambda e: console_errors.append(str(e)))
     page.on("dialog", lambda d: d.accept())
 
+    # Mock the published Garmin sleep file so the sync path is testable offline.
+    import datetime
+    import json as _json
+    today = datetime.date.today()
+    yesterday = today - datetime.timedelta(days=1)
+    days = {today.isoformat(): True, yesterday.isoformat(): True}
+    if today.day > 1:
+        days[today.replace(day=1).isoformat()] = False
+    garmin_fixture = {
+        "generated": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "threshold_hours": 7,
+        "days": days,
+    }
+    page.route("**/garmin-sleep.json*", lambda route: route.fulfill(
+        status=200, content_type="application/json", body=_json.dumps(garmin_fixture)))
+
     page.goto(BASE, wait_until="networkidle")
     page.evaluate("localStorage.clear()")
     page.reload(wait_until="networkidle")
@@ -41,6 +57,19 @@ def run(page):
           page.locator("#grid tbody tr").count())
     check("31 day columns", page.locator("#grid thead th.day-h").count() == 31)
     check("week headers 5", page.locator("#grid thead th.week-h").count() == 5)
+
+    # ---- Garmin sleep auto-fill ----
+    sleep_row = page.locator("#grid tbody tr", has_text="Sleep 7 hours").first
+    check("garmin badge on the sleep habit", page.locator("#grid .badge").count() == 1,
+          page.locator("#grid .badge").count())
+    check("sync pill reports connected",
+          page.locator("#syncState").get_attribute("data-state") == "ok",
+          page.locator("#syncState").get_attribute("data-state"))
+    check("sleep ticked for today from Garmin",
+          "on" in (sleep_row.locator("button.box").nth(today.day - 1).get_attribute("class") or ""))
+    if yesterday.month == today.month:
+        check("sleep ticked for yesterday from Garmin",
+              "on" in (sleep_row.locator("button.box").nth(yesterday.day - 1).get_attribute("class") or ""))
 
     # ---- tick the first habit on day 1 and day 2 ----
     row = page.locator("#grid tbody tr").first
