@@ -37,8 +37,18 @@ python -m http.server 8014 --bind 127.0.0.1
 python tools/ui_check.py        # smoke test + screenshots into tools/shots/
 ```
 
-## Deploy (Cloudflare Pages)
+## Deploy
+
+Live: **https://abhinavmanocha.github.io/habit-tracker/** (GitHub Pages, `main` branch root).
+
+Push to `main` and Pages rebuilds; verify the build with
+`gh api repos/abhinavmanocha/habit-tracker/pages/builds/latest --jq .status`.
+
+Cloudflare Pages is the intended long-term host but `wrangler login` cannot work on
+this PC (its localhost OAuth callback server never binds). With a Pages:Edit API token
+in `.cf-token`:
 
 ```
-npx wrangler@4 pages deploy . --project-name habit-tracker --branch main
+./deploy.sh          # or: npx wrangler@4 pages deploy . --project-name habit-tracker --branch main
 ```
+

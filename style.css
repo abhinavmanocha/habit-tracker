@@ -91,10 +91,11 @@ select:focus-visible, button:focus-visible, input:focus-visible {
 .panel > h2 .hint { color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 11.5px; }
 
 .charts { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(240px, 1fr); gap: 16px; }
+.charts > .panel { display: flex; flex-direction: column; }
 .chart-wrap { width: 100%; }
 .chart-wrap svg { display: block; width: 100%; height: auto; }
 
-.donut-flex { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.donut-flex { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex: 1; }
 .donut-svg { width: 132px; height: 132px; flex: 0 0 132px; }
 .legend { display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; min-width: 96px; }
 .legend div { display: flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 600; }
@@ -190,7 +191,7 @@ td.ov-day.dim { color: #b9bfd2; font-weight: 600; }
   text-align: right; padding: 5px 10px 5px 12px; font-size: 10.5px; font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap;
 }
-.wk-profit-cell { padding: 6px 8px; }
+.wk-profit-cell { padding: 6px 10px 6px 12px; }
 .wbar { font-size: 10.5px; font-weight: 700; color: var(--muted); }
 .wbar .track { height: 9px; border-radius: 99px; background: var(--line-soft); overflow: hidden; margin-top: 3px; }
 .wbar .track > i { display: block; height: 100%; border-radius: 99px; }
