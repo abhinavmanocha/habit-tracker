@@ -37,6 +37,32 @@ python -m http.server 8014 --bind 127.0.0.1
 python tools/ui_check.py        # smoke test + screenshots into tools/shots/
 ```
 
+## Cloud sync (cross-device)
+
+Data syncs through a Cloudflare Worker + D1 database, so phone, tablet and PC share one
+set of habits. Ticks are unioned (a tick is additive), habit metadata is last-write-wins,
+and deletes propagate as tombstones so another device can't resurrect them.
+
+- Worker: `https://habit-tracker-sync.abhinavmanocha.workers.dev` (`sync-worker/`)
+- Database: D1 `habit-tracker-sync` (`6e41733f-f658-4004-8077-46d8a996f527`)
+- API: `GET /api/state`, `PUT /api/state`, `GET /health` — bearer key, CORS locked to the
+  Pages origin and localhost.
+- Connect per device: **Connect** in the Month summary panel → paste the sync key. Stored
+  in that browser's `localStorage` (`ht-sync-key`), pushed 1.5 s after any change, pulled
+  on load, on focus and on **Sync now**.
+
+Redeploy the Worker after editing it:
+
+```
+cd sync-worker
+cf deploy --secrets-file .env.sync      # .env.sync holds SYNC_KEY, gitignored
+```
+
+Rotate the key with a new `SYNC_KEY` in `.env.sync`, redeploy, then re-connect each device.
+
+Test it: `python tools/sync_e2e.py <sync-key>` drives two real browser contexts against
+the deployed Worker (seed → pull → tick → delete propagation), then empties the server.
+
 ## Garmin sleep sync
 
 `tools/garmin_sync.py` logs into Garmin Connect, reads each night's sleep, and
