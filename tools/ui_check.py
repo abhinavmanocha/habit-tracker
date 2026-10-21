@@ -182,7 +182,12 @@ def run(page):
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
-    ctx = browser.new_context(viewport={"width": 1440, "height": 1000})
+    ctx = browser.new_context(
+        viewport={"width": 1440, "height": 1000},
+        # Block the service worker: it intercepts fetches (so route mocks are bypassed)
+        # and could serve a stale cached build instead of the deployed one.
+        service_workers="block",
+    )
     pg = ctx.new_page()
     try:
         run(pg)

@@ -24,6 +24,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent.parent
@@ -110,6 +111,7 @@ def build_payload(client, days: int, threshold: float, include_hours: bool) -> d
         else:
             print("  %s  no sleep record" % key)
         night += dt.timedelta(days=1)
+        time.sleep(0.2)  # stay polite with the Garmin API
 
     payload = {
         "generated": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -144,8 +146,8 @@ def publish(payload: dict, push: bool) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sync Garmin sleep into the habit tracker.")
-    parser.add_argument("--days", type=int, default=dt.date.today().day,
-                        help="how many days back to fetch (default: this month so far)")
+    parser.add_argument("--days", type=int, default=dt.date.today().day + 31,
+                        help="how many days back to fetch (default: this month + last month)")
     parser.add_argument("--threshold", type=float, default=None,
                         help="hours of sleep that count as a tick (default: config or 7)")
     parser.add_argument("--include-hours", action="store_true",
