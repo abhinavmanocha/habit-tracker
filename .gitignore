@@ -2,3 +2,7 @@
 node_modules/
 tools/shots/
 *.log
+
+# cf CLI local state
+.cloudflare/
+.wrangler/
