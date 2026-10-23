@@ -177,6 +177,48 @@ def run(page):
     page.wait_for_timeout(200)
     check("habit deleted (7 rows)", page.locator("#grid tbody tr").count() == 7)
 
+    # ---- today checklist (first thing on the page) ----
+    today_panel = page.locator(".today-panel").bounding_box()
+    charts = page.locator(".charts").bounding_box()
+    check("today checklist is above the charts", today_panel["y"] < charts["y"],
+          (today_panel["y"], charts["y"]))
+    check("today list has one row per habit", page.locator("#todayList .tick-row").count() == 7,
+          page.locator("#todayList .tick-row").count())
+
+    first_today = page.locator("#todayList .tick-row").first
+    name_before = first_today.locator(".tickname").inner_text()
+    was_done = "done" in (first_today.get_attribute("class") or "")
+    counted_before = page.locator("#todayCount").inner_text()
+    first_today.click()
+    page.wait_for_timeout(300)
+    now_done = "done" in (page.locator("#todayList .tick-row").first.get_attribute("class") or "")
+    check("tapping a today row toggles it", now_done != was_done, (was_done, now_done))
+    check("today counter follows the tick",
+          page.locator("#todayCount").inner_text() != counted_before,
+          (counted_before, page.locator("#todayCount").inner_text()))
+
+    # the grid must agree with the checklist row we just tapped
+    day_idx = today.day - 1
+    grid_row = page.locator("#grid tbody tr", has_text=name_before).first
+    grid_on = "on" in (grid_row.locator("button.box").nth(day_idx).get_attribute("class") or "")
+    check("grid tick matches the checklist", grid_on == now_done, (grid_on, now_done))
+
+    # yesterday too -> a 2-day streak chip should appear
+    page.evaluate("""() => {
+      const raw = JSON.parse(localStorage.getItem('habit-tracker-v2'));
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const p = n => String(n).padStart(2, '0');
+      const key = y.getFullYear() + '-' + p(y.getMonth() + 1) + '-' + p(y.getDate());
+      raw.habits[0].log[key] = true;
+      raw.habits[0].updatedAt = Date.now();
+      localStorage.setItem('habit-tracker-v2', JSON.stringify(raw));
+    }""")
+    page.reload(wait_until="networkidle")
+    page.wait_for_timeout(500)
+    check("streak chip appears for 2 consecutive days",
+          page.locator("#todayList .tickstreak").count() >= 1,
+          page.locator("#todayList .tickstreak").all_inner_texts())
+
     # ---- cloud sync (mocked Worker: same contract as the deployed one) ----
     site = {"payload": None, "puts": 0}
 

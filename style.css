@@ -72,6 +72,33 @@ h1 { font-size: 21px; margin: 0; font-weight: 700; letter-spacing: -.4px; }
 }
 .check-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--blue); margin: 0; }
 .cloud-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+/* ---------------- today checklist ---------------- */
+.today-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.today-head h2 { margin-bottom: 2px; }
+.today-head h2 .hint { margin-left: 2px; font-weight: 500; }
+.today-head h2 .hint::before { content: "·"; margin-right: 8px; color: #b7bfd4; }
+.today-score { text-align: right; line-height: 1.15; }
+.today-score b { display: block; font-size: 27px; font-weight: 800; color: var(--blue); letter-spacing: -.02em; }
+.today-bar { height: 8px; border-radius: 999px; background: #e7eaf3; overflow: hidden; margin: 14px 0 0; }
+.today-bar i { display: block; height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--amber)); transition: width .35s ease; }
+.tick-list { display: grid; gap: 9px; margin-top: 14px; }
+.tick-row { display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 14px;
+  padding: 15px 16px; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink);
+  cursor: pointer; transition: border-color .15s, background .15s; }
+.tick-row:hover { border-color: var(--blue-border); }
+.tick-row.done { background: #f5f8ff; border-color: #cfdbf7; color: var(--muted); }
+.tick-row.done .tickname { text-decoration: line-through; }
+.tickbox { width: 27px; height: 27px; flex: none; border-radius: 9px; border: 2px solid #c3ccdd;
+  display: grid; place-items: center; transition: background .15s, border-color .15s; }
+.tick-row.done .tickbox { background: var(--blue); border-color: var(--blue); }
+.tickmark { color: #fff; font-size: 15px; font-weight: 800; opacity: 0; transition: opacity .15s; }
+.tick-row.done .tickmark { opacity: 1; }
+.tickname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tickstreak { flex: none; font-size: 12px; font-weight: 700; color: #a35f00; background: var(--soft-amber);
+  border: 1px solid var(--amber-border); border-radius: 999px; padding: 3px 9px; }
 .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 select, .btn {
   font-family: inherit; font-size: 13px; font-weight: 600;
@@ -279,6 +306,20 @@ input[type="text"]:focus, input[type="number"]:focus { background: #fff; border-
   :root { --namew: 168px; }
   td.day-cell { width: 24px; min-width: 24px; }
   .ov th.day-h, .ov td.ov-day { width: 24px; min-width: 24px; }
+}
+@media (max-width: 560px) {
+  .topbar { gap: 10px; margin-bottom: 12px; }
+  .logo { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 11px; font-size: 18px; }
+  h1 { font-size: 18px; }
+  .controls { width: 100%; gap: 6px; }
+  .controls select { flex: 1 1 0; padding: 8px 10px; font-size: 12px; }
+  .controls .btn { flex: 0 0 auto; padding: 8px 11px; font-size: 12px; }
+  .tick-row { padding: 13px 14px; font-size: 14.5px; gap: 11px; }
+  .tickbox { width: 25px; height: 25px; }
+  .today-score b { font-size: 23px; }
+}
+@media (min-width: 760px) {
+  .tick-list { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 960px) {
   .charts, .bottom { grid-template-columns: minmax(0, 1fr); }

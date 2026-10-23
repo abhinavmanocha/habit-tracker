@@ -473,6 +473,8 @@
         box.textContent = '✓';
         box.setAttribute('aria-pressed', h.log[k] ? 'true' : 'false');
         box.setAttribute('aria-label', h.name + ', day ' + d);
+        box.dataset.h = h.id;      // lets the Today checklist find this box
+        box.dataset.k = k;
         box.addEventListener('click', function (habit, dayKey, button) {
           return function () { toggle(habit, dayKey, button); };
         }(h, k, box));
@@ -528,14 +530,88 @@
     if (h.log[k]) delete h.log[k];
     else h.log[k] = true;
     h.updatedAt = Date.now();
-    box.classList.toggle('on');
-    box.setAttribute('aria-pressed', h.log[k] ? 'true' : 'false');
+    if (!box) {
+      // ticked from the Today checklist: update the month grid's box for the same day
+      var boxes = document.querySelectorAll('#grid button.box[data-k="' + k + '"]');
+      for (var i = 0; i < boxes.length; i++) {
+        if (boxes[i].dataset.h === h.id) { box = boxes[i]; break; }
+      }
+    }
+    if (box) {
+      box.classList.toggle('on', !!h.log[k]);
+      box.setAttribute('aria-pressed', h.log[k] ? 'true' : 'false');
+    }
     save();
+    renderToday();
     updateRowStats(h);
     renderOverview();
     renderCharts();
     renderTop();
     renderTiles();
+  }
+
+  /* ---------------- today checklist ---------------- */
+  function streakOf(h) {
+    var d = new Date(), n = 0, guard = 0;
+    while (guard++ < 500) {
+      if (h.log[K(d.getFullYear(), d.getMonth(), d.getDate())]) n++;
+      else if (guard > 1) break;   // an unticked today doesn't break a live streak
+      d.setDate(d.getDate() - 1);
+    }
+    return n;
+  }
+
+  function renderToday() {
+    var host = document.getElementById('todayList');
+    if (!host) return;
+    var now = new Date();
+    var k = K(now.getFullYear(), now.getMonth(), now.getDate());
+    document.getElementById('todayDate').textContent =
+      now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+    var done = 0;
+    habits.forEach(function (h) { if (h.log[k]) done++; });
+    document.getElementById('todayCount').textContent = done + ' / ' + habits.length;
+    document.getElementById('todayFill').style.width =
+      habits.length ? Math.round((done / habits.length) * 100) + '%' : '0%';
+
+    host.textContent = '';
+    var note = document.getElementById('todayNote');
+
+    if (!habits.length) {
+      note.textContent = 'No habits yet.';
+      var first = el('button', 'tick-row', '+ Add your first habit');
+      first.type = 'button';
+      first.addEventListener('click', function () { openEditor(null); });
+      host.appendChild(first);
+      return;
+    }
+
+    note.textContent = done === habits.length
+      ? 'All done for today — nice work.'
+      : (habits.length - done) + ' left today · tap a habit to tick it off';
+
+    habits.forEach(function (h) {
+      var on = !!h.log[k];
+      var row = el('button', 'tick-row' + (on ? ' done' : ''));
+      row.type = 'button';
+      row.setAttribute('aria-pressed', on ? 'true' : 'false');
+      row.setAttribute('aria-label', (on ? 'Untick ' : 'Tick ') + h.name);
+
+      var box = el('span', 'tickbox');
+      box.appendChild(el('span', 'tickmark', '✓'));
+      row.appendChild(box);
+      row.appendChild(el('span', 'tickname', h.name));
+
+      var st = streakOf(h);
+      if (st > 1) {
+        var chip = el('span', 'tickstreak', st + 'd');
+        chip.title = st + '-day streak';
+        row.appendChild(chip);
+      }
+      row.addEventListener('click', function () { toggle(h, k, null); });
+      host.appendChild(row);
+    });
   }
 
   /* ---------------- top 10 + tiles ---------------- */
@@ -938,6 +1014,7 @@
 
     var scroller = document.getElementById('gridScroll');
     var keepLeft = scroller ? scroller.scrollLeft : 0;
+    renderToday();
     renderGrid();
     renderOverview();
     renderCharts();
