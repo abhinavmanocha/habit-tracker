@@ -124,6 +124,20 @@ def run(page):
     check("line chart svg present", page.locator("#lineChart svg").count() == 1)
     check("chart has data path", page.locator("#lineChart path").count() >= 1)
 
+    # axis must stay legible: a handful of labels, none touching each other
+    labels = page.evaluate("""() => [...document.querySelectorAll('#lineChart .xlab-major')]
+        .map(t => ({ txt: t.textContent, box: t.getBoundingClientRect(), size: parseFloat(getComputedStyle(t).fontSize) }))""")
+    check("axis shows few, spaced day labels", 5 <= len(labels) <= 8, [l["txt"] for l in labels])
+    check("axis labels are readable (>=9px)", all(l["size"] >= 9 for l in labels),
+          [l["size"] for l in labels])
+    overlaps = [(a["txt"], b_["txt"]) for a, b_ in zip(labels, labels[1:])
+                if a["box"]["x"] + a["box"]["width"] + 2 > b_["box"]["x"]]
+    check("no overlapping axis labels", not overlaps, overlaps)
+    check("axis labels sit inside the chart",
+          all(0 <= l["box"]["x"] and l["box"]["x"] + l["box"]["width"] <= page.viewport_size["width"]
+              for l in labels),
+          [(l["txt"], round(l["box"]["x"])) for l in labels])
+
     # ---- month navigation ----
     page.select_option("#monthSel", "8")  # September 2026 = 30 days
     page.wait_for_timeout(150)

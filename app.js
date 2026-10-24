@@ -157,7 +157,12 @@
   function drawLine(series, dim, upto) {
     var host = document.getElementById('lineChart');
     host.textContent = '';
-    var W = 760, H = 236, L = 40, R = 12, T = 12, B = 32;
+
+    // Draw in real pixels (the panel width varies) so axis text is never scaled tiny.
+    var W = Math.round(host.clientWidth || 760);
+    if (W < 280) W = 280;
+    var H = W < 520 ? 210 : 240;
+    var L = 40, R = 10, T = 12, B = 30;
     var iw = W - L - R, ih = H - T - B;
     var svg = svgEl('svg', {
       viewBox: '0 0 ' + W + ' ' + H,
@@ -171,7 +176,7 @@
         x1: L, x2: W - R, y1: y, y2: y, stroke: '#e7eaf3', 'stroke-width': 1
       }));
       var lab = svgEl('text', {
-        x: L - 8, y: y + 3.5, 'text-anchor': 'end', 'font-size': 9, fill: '#9aa1b8'
+        x: L - 8, y: y + 3.5, 'text-anchor': 'end', 'font-size': 10, fill: '#9aa1b8'
       });
       lab.textContent = (g * 25) + '%';
       svg.appendChild(lab);
@@ -219,16 +224,24 @@
       svg.appendChild(none);
     }
 
-    for (var d2 = 1; d2 <= dim; d2++) {
-      var major = (d2 === 1 || d2 % 5 === 0);
+    // Label every 5th day (plus the last day) and keep a tick mark for orientation —
+    // 31 separate numbers collide into an unreadable smear at narrow widths.
+    var ticks = [1, 6, 11, 16, 21, 26].filter(function (d) { return d <= dim; });
+    if (dim - ticks[ticks.length - 1] >= 2) ticks.push(dim);
+
+    ticks.forEach(function (d2) {
+      var x = xAt(d2);
+      svg.appendChild(svgEl('line', {
+        x1: x.toFixed(1), x2: x.toFixed(1), y1: T + ih, y2: T + ih + 4,
+        stroke: '#ccd2e4', 'stroke-width': 1
+      }));
       var tx = svgEl('text', {
-        x: xAt(d2).toFixed(1), y: H - B + 15, 'text-anchor': 'middle',
-        'font-size': major ? 9 : 8, fill: major ? '#6a7290' : '#c3c8d8',
-        'class': major ? 'xlab xlab-major' : 'xlab'
+        x: x.toFixed(1), y: H - B + 17, 'text-anchor': 'middle',
+        'font-size': 10.5, fill: '#6a7290', 'class': 'xlab xlab-major'
       });
       tx.textContent = d2;
       svg.appendChild(tx);
-    }
+    });
 
     host.appendChild(svg);
   }
@@ -1137,6 +1150,13 @@
         renderAll();                      // day rollover while open
         if (hasSync()) pullRemote();      // catch up with other devices
       }
+    });
+
+    // the line chart is drawn in real pixels, so it must redraw when the panel resizes
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () { renderCharts(); }, 180);
     });
 
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0 &&
