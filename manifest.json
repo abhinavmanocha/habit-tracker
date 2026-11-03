@@ -1,13 +1,14 @@
 {
-  "name": "Habit Tracker",
+  "name": "Habits — daily tracker",
   "short_name": "Habits",
-  "description": "Monthly habit tracker with weekly progress, daily charts and consistency rankings.",
+  "description": "Tick today's habits in one tap, fix any day, and watch your streaks build.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#eeeeee",
   "theme_color": "#0038bd",
+  "categories": ["productivity", "lifestyle", "health"],
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

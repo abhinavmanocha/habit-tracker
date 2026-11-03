@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0038bd">
-<meta name="description" content="Monthly habit tracker with weekly progress, daily charts and consistency rankings.">
+<meta name="description" content="Daily habit tracker: tick today at a glance, see your month, keep your streaks.">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Habits">
-<title>Habit Tracker</title>
+<title>Habits</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,47 +18,61 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
-<div class="shell">
 
-  <div class="topbar">
-    <div class="brand">
-      <div class="logo" aria-hidden="true">✓</div>
-      <div>
-        <h1>Habit Tracker</h1>
-        <p class="sub"><span id="saveState">All changes saved</span> · <span class="sync-pill" id="syncState" data-state="off">Garmin · not connected</span></p>
-      </div>
-    </div>
-    <div class="controls">
-      <select id="yearSel" aria-label="Year"></select>
-      <select id="monthSel" aria-label="Month"></select>
-      <button class="btn ghost" id="syncBtn" type="button">Sync Garmin</button>
-      <button class="btn primary" id="addBtn" type="button">+ New habit</button>
-    </div>
-  </div>
+<header class="appbar">
+  <button class="icon-btn" id="prevMonth" type="button" aria-label="Previous month">‹</button>
+  <button class="month-btn" id="monthLabel" type="button">October 2026</button>
+  <button class="icon-btn" id="nextMonth" type="button" aria-label="Next month">›</button>
+  <button class="icon-btn add-btn" id="addBtn" type="button" aria-label="New habit">+</button>
+</header>
 
-  <section class="panel today-panel">
-    <div class="today-head">
-      <div>
-        <h2>Today <span class="hint" id="todayDate"></span></h2>
-        <p class="sub" id="todayNote">Tap a habit to tick it off.</p>
-      </div>
-      <div class="today-score">
-        <b id="todayCount">0 / 0</b>
-        <span class="hint">done today</span>
+<main id="main">
+
+  <!-- ---------- TODAY ---------- -->
+  <section class="view" id="view-today" aria-labelledby="todayHeading">
+    <div class="hero">
+      <div class="ring" id="todayRing" aria-hidden="true"></div>
+      <div class="hero-copy">
+        <h1 id="todayHeading">Today</h1>
+        <p class="hero-sub" id="todayDate">—</p>
+        <p class="hero-left" id="todayLeft"></p>
       </div>
     </div>
-    <div class="today-bar"><i id="todayFill"></i></div>
-    <div class="tick-list" id="todayList"></div>
+    <div class="list" id="todayList"></div>
   </section>
 
-  <div class="charts">
-    <section class="panel">
-      <h2>Daily completion <span class="hint">% of habits ticked each day</span></h2>
-      <div class="chart-wrap" id="lineChart"></div>
-    </section>
+  <!-- ---------- MONTH ---------- -->
+  <section class="view" id="view-month" aria-labelledby="monthHeading" hidden>
+    <div class="month-top">
+      <div>
+        <h1 id="monthHeading">October</h1>
+        <p class="hero-sub" id="monthSub">—</p>
+      </div>
+      <div class="month-score">
+        <b id="monthPct">0%</b>
+        <span>of days so far</span>
+      </div>
+    </div>
+    <div class="list" id="monthList"></div>
+  </section>
 
-    <section class="panel">
-      <h2>Overview daily progress</h2>
+  <!-- ---------- STATS ---------- -->
+  <section class="view" id="view-stats" aria-labelledby="statsHeading" hidden>
+    <h1 id="statsHeading" class="view-title">Stats</h1>
+
+    <div class="tiles">
+      <div class="tile"><span class="k">Ticks</span><b class="v" id="tileTicks">0</b></div>
+      <div class="tile amber"><span class="k">Consistency</span><b class="v" id="tileCons">0%</b></div>
+      <div class="tile"><span class="k">Perfect days</span><b class="v" id="tilePerfect">0</b></div>
+    </div>
+
+    <div class="panel">
+      <h2>Daily completion</h2>
+      <div class="chart-wrap" id="lineChart"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Month to date</h2>
       <div class="donut-flex">
         <div class="donut-svg" id="donut"></div>
         <div class="legend">
@@ -65,82 +80,122 @@
           <div><i style="background:#e7eaf3"></i> Left <b id="donutLeft">0</b></div>
         </div>
       </div>
-    </section>
-  </div>
-
-  <section class="panel">
-    <h2>Daily overview <span class="hint">completed · goal · left, by day</span></h2>
-    <div class="scroll">
-      <div id="overview"></div>
     </div>
-  </section>
 
-  <section class="panel">
-    <h2>Daily habits <span class="hint">tap any box to tick it — tap a habit name to edit</span></h2>
-    <div class="scroll" id="gridScroll">
-      <div id="grid"></div>
-    </div>
-  </section>
-
-  <div class="bottom">
-    <section class="panel">
-      <h2>Top 10 consistent habits</h2>
+    <div class="panel">
+      <h2>Most consistent</h2>
       <ol class="top" id="topHabits"></ol>
-    </section>
+    </div>
+  </section>
 
-    <section class="panel">
-      <h2>Month summary</h2>
-      <div class="tiles">
-        <div class="tile"><div class="k">Ticks</div><div class="v" id="tileTicks">0</div></div>
-        <div class="tile amber"><div class="k">Consistency</div><div class="v" id="tileCons">0%</div></div>
-        <div class="tile"><div class="k">Perfect days</div><div class="v" id="tilePerfect">0</div></div>
+  <!-- ---------- SETTINGS ---------- -->
+  <section class="view" id="view-settings" aria-labelledby="settingsHeading" hidden>
+    <h1 id="settingsHeading" class="view-title">Settings</h1>
+
+    <div class="panel">
+      <h2>Cloud sync</h2>
+      <p class="hint">Every connected device shares one set of habits.</p>
+      <div class="state-row">
+        <span class="pill" id="cloudState" data-state="off">Sync off</span>
+        <button class="btn ghost" id="cloudSyncNow" type="button" hidden>Sync now</button>
       </div>
-      <div class="cloud-row">
-        <span class="sync-pill" id="cloudState" data-state="off">Sync off</span>
-        <button class="btn ghost" id="cloudSyncNow" type="button" style="display:none">Sync now</button>
-        <button class="btn ghost" id="cloudBtn" type="button">Connect</button>
+      <div class="btn-row">
+        <button class="btn primary" id="cloudBtn" type="button">Connect</button>
+        <button class="btn ghost" id="cloudForget" type="button" hidden>Disconnect</button>
       </div>
-      <p class="sub" style="margin-top:14px">
-        <button class="btn ghost" id="exportBtn" type="button">Export backup</button>
-        <button class="btn ghost" id="importBtn" type="button">Import backup</button>
+      <p class="hint" id="storageNote">Data is stored in this browser only.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Garmin sleep</h2>
+      <p class="hint">Nights that reach your target tick the sleep habit automatically.</p>
+      <div class="state-row">
+        <span class="pill" id="syncState" data-state="off">Not connected</span>
+        <button class="btn ghost" id="syncBtn" type="button">Sync now</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Backup</h2>
+      <p class="hint">A JSON file with every habit and tick.</p>
+      <div class="btn-row">
+        <button class="btn ghost" id="exportBtn" type="button">Export</button>
+        <button class="btn ghost" id="importBtn" type="button">Import</button>
         <input type="file" id="importFile" accept="application/json" hidden>
-      </p>
-      <p class="sub" style="margin-top:8px" id="storageNote">Data is stored in this browser only.</p>
-    </section>
-  </div>
+      </div>
+    </div>
 
+    <p class="hint footer-note"><span id="saveState">All changes saved</span> · Habits</p>
+  </section>
+
+</main>
+
+<nav class="tabbar" id="tabbar" aria-label="Main">
+  <button class="tab" data-view="today" type="button" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.2 9.2 17.4 20 6.6"/></svg>
+    <span>Today</span>
+  </button>
+  <button class="tab" data-view="month" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8.5 3.5v3M15.5 3.5v3"/></svg>
+    <span>Month</span>
+  </button>
+  <button class="tab" data-view="stats" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16"/><rect x="6" y="12" width="3.4" height="5.5" rx="1"/><rect x="11" y="7" width="3.4" height="10.5" rx="1"/><rect x="16" y="9.5" width="3.4" height="8" rx="1"/></svg>
+    <span>Stats</span>
+  </button>
+  <button class="tab" data-view="settings" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.2M12 18.3v2.2M4.9 7.8l1.9 1.1M17.2 15.1l1.9 1.1M4.9 16.2l1.9-1.1M17.2 8.9l1.9-1.1"/></svg>
+    <span>Settings</span>
+  </button>
+</nav>
+
+<!-- habit detail: tap any day of the month -->
+<div class="sheet-wrap" id="habitSheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="grabber" aria-hidden="true"></div>
+    <h2 id="sheetTitle">Habit</h2>
+    <p class="hero-sub" id="sheetMeta">—</p>
+    <div class="cal" id="sheetCal"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="sheetEdit" type="button">Edit</button>
+      <button class="btn ghost" id="sheetDelete" type="button">Delete</button>
+      <button class="btn primary" id="sheetClose" type="button">Done</button>
+    </div>
+  </div>
 </div>
 
-<div class="scrim" id="scrim">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+<!-- habit editor -->
+<div class="sheet-wrap" id="scrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+    <div class="grabber" aria-hidden="true"></div>
     <h2 id="editorTitle">New habit</h2>
     <p class="hint" id="editorHint">Give it a name and a target.</p>
     <label class="field" for="nameInput">Habit name</label>
-    <input type="text" id="nameInput" maxlength="60" autocomplete="off" placeholder="e.g. Exercise 45 min">
-    <label class="field" for="goalInput">Monthly goal (days)</label>
-    <input type="number" id="goalInput" min="0" max="31" step="1">
+    <input type="text" id="nameInput" maxlength="60" autocomplete="off" placeholder="e.g. Walk 8,000 steps" enterkeyhint="done">
+    <label class="field" for="goalInput">Target days this month</label>
+    <input type="number" id="goalInput" min="0" max="31" step="1" inputmode="numeric">
     <label class="check-row" for="garminToggle">
       <input type="checkbox" id="garminToggle">
       <span>Auto-fill from Garmin sleep</span>
     </label>
     <p class="hint" id="garminHint">Nights that reach the target are ticked for you on sync.</p>
-    <div class="modal-actions">
+    <div class="btn-row">
       <button class="btn ghost" id="cancelBtn" type="button">Cancel</button>
-      <button class="btn danger" id="deleteHabit" type="button">Delete</button>
       <button class="btn primary" id="saveBtn" type="button">Save</button>
     </div>
   </div>
 </div>
 
-<div class="scrim" id="cloudScrim">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
-    <h2 id="cloudTitle">Cloud sync</h2>
-    <p class="hint">Enter the sync key on each device. It stays in this browser and is only sent to your own Cloudflare Worker.</p>
+<!-- cloud key -->
+<div class="sheet-wrap" id="cloudScrim">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
+    <div class="grabber" aria-hidden="true"></div>
+    <h2 id="cloudTitle">Cloud sync key</h2>
+    <p class="hint">Paste the key once per device. It is stored in this browser and only sent to your own Cloudflare Worker.</p>
     <label class="field" for="cloudKey">Sync key</label>
     <input type="text" id="cloudKey" autocomplete="off" spellcheck="false" placeholder="word-word-0000-word">
-    <div class="modal-actions">
+    <div class="btn-row">
       <button class="btn ghost" id="cloudCancel" type="button">Cancel</button>
-      <button class="btn danger" id="cloudForget" type="button">Disconnect</button>
       <button class="btn primary" id="cloudSave" type="button">Connect</button>
     </div>
   </div>
