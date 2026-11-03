@@ -29,12 +29,29 @@ def check(name, cond, detail=""):
         failures.append(name)
 
 
+def server_habits():
+    req = urllib.request.Request(API, headers={"Authorization": "Bearer " + KEY, **UA})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        payload = (json.load(r) or {}).get("payload") or {}
+    return payload.get("habits") or []
+
+
 def reset_server():
     body = json.dumps({"payload": {"version": 3, "habits": [], "deleted": []}}).encode()
     req = urllib.request.Request(API, data=body, method="PUT", headers={
         "Authorization": "Bearer " + KEY, "Content-Type": "application/json", **UA})
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.status
+
+
+# This test wipes the database it runs against. Refuse unless it is already empty
+# (real households use this server — never assume a scratch environment).
+existing = server_habits()
+if existing and "--force" not in sys.argv:
+    print("REFUSING TO RUN: the sync database holds %d real habit(s): %s"
+          % (len(existing), ", ".join(h.get("name", "?") for h in existing[:5])))
+    print("Use tools/sync_pullcheck.py for a non-destructive check, or pass --force to wipe.")
+    sys.exit(2)
 
 
 def connect(page):
